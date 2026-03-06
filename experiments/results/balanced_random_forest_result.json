@@ -1,0 +1,10 @@
+{
+  "model": "Balanced Random Forest",
+  "accuracy": 1.0,
+  "precision": 0.9927,
+  "recall": 1.0,
+  "f1_score": 0.9963,
+  "roc_auc": 1.0,
+  "timestamp": "2026-03-05 21:26:04",
+  "train_time_seconds": 189.98
+}

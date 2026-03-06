@@ -1,0 +1,100 @@
+# ============================================================
+# HEATWAVE-AI-Prediction — Central Configuration
+# ============================================================
+
+project:
+  name: "HEATWAVE-AI-Prediction"
+  version: "1.0.0"
+  description: "Modular AI Experimentation Framework for Heatwave Prediction"
+
+# ---- Training (GPU / CPU / Mixed Precision) ---------------------
+training:
+  use_gpu: true          # Set to false to force CPU even if GPU is available
+  mixed_precision: true  # Enable FP16 AMP for PyTorch models (GPU only)
+  batch_size: 512        # Default batch size for neural network models
+
+# ---- Data -------------------------------------------------------
+data:
+  raw_dir: "Era5-data-2000-2026"
+  processed_dir: "data/processed"
+  years: [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+          2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
+  surface_prefix: "era5_surface_"
+  upper_prefix: "era5_upper_"
+  heatwave_threshold_celsius: 35.0
+  features:
+    - "t2m"        # 2m air temperature (K)
+    - "d2m"        # 2m dewpoint temperature (K)
+    - "sp"         # Surface pressure (Pa)
+    - "u10"        # 10m U-wind component (m/s)
+    - "v10"        # 10m V-wind component (m/s)
+  label_col: "heatwave"
+
+# ---- Split ------------------------------------------------------
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  random_state: 42
+  stratify: true
+
+# ---- Experiment Tracking ----------------------------------------
+experiments:
+  results_dir: "experiments/results"
+  models_dir: "experiments/models"
+  logs_dir: "experiments/logs"
+  leaderboard_file: "experiments/results/leaderboard.json"
+
+# ---- Models -----------------------------------------------------
+models:
+  balanced_rf:
+    n_estimators: 200
+    max_depth: 15
+    random_state: 42
+    n_jobs: -1
+
+  xgboost:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+    n_jobs: -1
+    eval_metric: "logloss"
+
+  lightgbm:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.1
+    num_leaves: 63
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+    n_jobs: -1
+    verbose: -1
+
+  mlp:
+    hidden_layers: [256, 128, 64]
+    dropout: 0.3
+    learning_rate: 0.001
+    batch_size: 512
+    max_epochs: 100
+    patience: 10  # early stopping
+    random_state: 42
+
+  kan:
+    hidden_layers: [64, 32]
+    grid_size: 5       # B-spline grid points
+    spline_order: 3
+    learning_rate: 0.001
+    batch_size: 512
+    max_epochs: 50
+    patience: 8
+    random_state: 42
+
+# ---- Dashboard --------------------------------------------------
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
