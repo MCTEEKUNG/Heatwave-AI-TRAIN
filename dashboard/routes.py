@@ -30,7 +30,7 @@ def _get_results_dir():
     try:
         import yaml
         config_path = current_app.config.get("CONFIG_PATH", "config/config.yaml")
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         return cfg["experiments"]["results_dir"]
     except Exception:

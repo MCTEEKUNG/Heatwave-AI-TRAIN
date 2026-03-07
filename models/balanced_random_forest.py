@@ -17,7 +17,7 @@ class BalancedRandomForestModel(BaseModel):
     """Balanced Random Forest Classifier (handles class imbalance natively)."""
 
     def __init__(self, config_path: str = "config/config.yaml"):
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         params = cfg["models"]["balanced_rf"]
 

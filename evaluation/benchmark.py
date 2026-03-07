@@ -28,7 +28,7 @@ class Benchmark:
             if fname.endswith(".json") and fname != "leaderboard.json":
                 fpath = os.path.join(self.results_dir, fname)
                 try:
-                    with open(fpath, "r") as f:
+                    with open(fpath, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     results.append(data)
                 except Exception as e:

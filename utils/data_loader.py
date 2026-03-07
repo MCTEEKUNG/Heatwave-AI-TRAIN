@@ -19,7 +19,7 @@ class ERA5DataLoader:
     """Loads ERA5 surface NetCDF files and converts them to a DataFrame."""
 
     def __init__(self, config_path: str = "config/config.yaml"):
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
 
         self.raw_dir = self.cfg["data"]["raw_dir"]
@@ -56,37 +56,34 @@ class ERA5DataLoader:
 
     # ------------------------------------------------------------------
     def _dataset_to_df(self, ds: xr.Dataset, year: int) -> pd.DataFrame:
-        """Convert an xarray Dataset to a flat DataFrame row per (time, lat, lon)."""
-        # Determine available feature columns
+        """
+        Convert an xarray Dataset to a flat DataFrame row per (time, lat, lon).
+        Includes time, latitude, and longitude coordinates.
+        """
+        # Select only the variables we want + the coordinates
         available_vars = list(ds.data_vars)
         load_vars = [v for v in self.features if v in available_vars]
-        missing = set(self.features) - set(load_vars)
-        if missing:
-            logger.debug("Year %d: variables not found, will be NaN: %s", year, missing)
+        
+        # Convert to dataframe
+        # This will result in a MultiIndex (time, latitude/lat, longitude/lon)
+        df = ds[load_vars].to_dataframe().reset_index()
+        
+        # Standardize coordinate names
+        rename_map = {
+            "valid_time": "time",
+            "lat": "latitude", "lon": "longitude",
+            "y": "latitude", "x": "longitude"
+        }
+        df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
-        # Stack dimensions into rows
-        records = {}
-        for var in load_vars:
-            arr = ds[var].values  # shape: (time, lat, lon) or (lat, lon)
-            if arr.ndim == 3:
-                records[var] = arr.flatten()
-            elif arr.ndim == 2:
-                # Broadcast along time axis if present
-                n_time = ds.dims.get("time", 1)
-                records[var] = np.tile(arr.flatten(), n_time)
-            else:
-                records[var] = arr.flatten()
+        # Drop unnecessary ERA5 metadata columns if they exist
+        drop_cols = ["number", "expver"]
+        df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
 
-        # Align lengths
-        lengths = [len(v) for v in records.values()]
-        if len(set(lengths)) > 1:
-            min_len = min(lengths)
-            records = {k: v[:min_len] for k, v in records.items()}
-
-        df = pd.DataFrame(records)
+        # Add year column for tracking
         df["year"] = year
 
-        # Fill any missing configured features with NaN columns
+        # Ensure all configured features exist (even if NaN)
         for var in self.features:
             if var not in df.columns:
                 df[var] = np.nan

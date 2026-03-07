@@ -40,7 +40,7 @@ class TrainingPipeline:
 
     def __init__(self, config_path: str = "config/config.yaml"):
         self.config_path = config_path
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
 
         self.preprocessor = HeatwavePreprocessor(config_path)

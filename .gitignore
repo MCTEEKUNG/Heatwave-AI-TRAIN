@@ -7,6 +7,7 @@ experiments/models/*.pth
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 .Python
@@ -30,6 +31,10 @@ env/
 *.feather
 data/raw/
 data/processed/
+data/ndvi/
+Era5-data-2000-2026/
+*.nc
+*.tif
 
 # Logs
 logs/

@@ -24,7 +24,7 @@ def create_app(config_path: str = "config/config.yaml") -> Flask:
 
 if __name__ == "__main__":
     import yaml
-    with open("config/config.yaml") as f:
+    with open("config/config.yaml", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     dash = cfg.get("dashboard", {})
     app = create_app()

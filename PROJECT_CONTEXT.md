@@ -1,289 +1,350 @@
 # HEATWAVE-AI-Prediction — PROJECT CONTEXT
 
-**Version**: 1.0.0  
-**Date**: 2026-03-05  
-**Status**: ✅ Initial Implementation Complete  
+**Version**: 2.1.0
+**Date**: 2026-03-07
+**Status**: ✅ Ready for GPU Training — 26 Years (43M Samples) + NDVI Aligned + Performance Optimized
 **Author**: HEATWAVE-AI Team
+
+---
+
+## Changelog v1.0 → v2.0
+
+| รายการ                  | v1.0                 | v2.0                                    |
+| ----------------------- | -------------------- | --------------------------------------- |
+| **Heatwave Definition** | `t2m_c >= 35°C`      | **Heat Index >= 41°C** (Rothfusz)       |
+| **RH Calculation**      | ไม่มี                | **August-Roche-Magnus formula**         |
+| **Heat Index Formula**  | Steadman (approx.)   | **Rothfusz Regression (NWS standard)**  |
+| **NDVI**                | ไม่มี                | **MODIS MOD13A3 (GEE)** — optional      |
+| **Training Period**     | 2000–2015            | 2000–2015 (+ 2016–2025 extension พร้อม) |
+| **Feature Count**       | 5                    | 6 (+ ndvi/lag เมื่อ enabled)            |
+| **Encoding**            | Windows cp1252 (bug) | **UTF-8 ทุกไฟล์**                       |
+| **Labeling Mode**       | Fixed                | Dual-mode: `heat_index` / `temperature` |
 
 ---
 
 ## 1. Project Overview
 
-HEATWAVE-AI-Prediction is a **modular AI experimentation platform** for binary heatwave classification. It trains, benchmarks, and serves five machine learning models using ERA5 reanalysis climate data covering 2000–2015.
+HEATWAVE-AI-Prediction เป็น **modular AI experimentation platform** สำหรับ Binary Heatwave Classification ในพื้นที่ประเทศไทย ใช้ ERA5 Reanalysis Climate Data และ MODIS NDVI ในการเทรน 5 โมเดล Machine Learning
 
 ### Goals
-- Train 5 ML models on ERA5 climate features
-- Automatically benchmark and rank models by F1 Score on a leaderboard
-- Persist trained models for future real-time inference
-- Visualize results in a premium dark-mode web dashboard
-- Launch the entire system with a single click via [`Start.bat`](Start.bat)
+
+- เทรน 5 ML models บน ERA5 + NDVI features ของประเทศไทย
+- Benchmark และ rank models อัตโนมัติด้วย Leaderboard
+- บันทึก trained models เพื่อ real-time inference
+- แสดงผลผ่าน premium dark-mode web dashboard
+- เปิดระบบทั้งหมดผ่าน [`Start.bat`](Start.bat) คลิกเดียว
 
 ---
 
 ## 2. System Architecture
 
 ```
-HEATWAVE-AI-Prediction/
+HEATWAVE-AI-TRAIN/
 │
-├── Era5-data-2000-2026/         ← Raw ERA5 NetCDF files (surface + upper, 2000–2015)
+├── Era5-data-2000-2026/          ← ERA5 NetCDF files (era5_surface_YYYY.nc)
+│
+├── data/
+│   └── ndvi/                     ← [NEW v2.0] MODIS NDVI GeoTIFF + ndvi_aligned_era5.nc
 │
 ├── config/
-│   └── config.yaml              ← Central configuration (paths, thresholds, hyperparams)
+│   └── config.yaml               ← Central config (paths, thresholds, NDVI settings)
 │
 ├── utils/
-│   ├── data_loader.py           ← ERA5 NetCDF → pandas DataFrame
-│   ├── preprocessing.py         ← Feature engineering, heatwave labels, StandardScaler, splits
-│   └── gpu_utils.py             ← CUDA availability helper
+│   ├── data_loader.py            ← ERA5 NetCDF → pandas DataFrame
+│   ├── preprocessing.py          ← [UPDATED v2.0] Rothfusz HI, dual-mode labels, NDVI merge
+│   ├── gpu_utils.py              ← CUDA detection helper
+│   ├── ndvi_downloader.py        ← [NEW v2.0] MODIS NDVI download via GEE
+│   └── ndvi_processor.py         ← [NEW v2.0] Reproject + Resample + Lag features
 │
-├── models/
-│   ├── base_model.py            ← Abstract BaseModel interface
+├── models/                       ← 5 ML model implementations (unchanged)
 │   ├── balanced_random_forest.py
 │   ├── xgboost_model.py
 │   ├── lightgbm_model.py
-│   ├── mlp_model.py             ← PyTorch 3-layer MLP with early stopping
-│   └── kan_model.py             ← KAN with learnable B-spline activations (PyTorch)
+│   ├── mlp_model.py
+│   └── kan_model.py
 │
-├── training/
-│   ├── trainer.py               ← Train → evaluate → save cycle
-│   ├── cross_validation.py      ← StratifiedKFold CV helper
-│   └── hyperparameter_tuning.py ← GridSearch / RandomSearch wrappers
-│
-├── pipelines/
-│   └── training_pipeline.py     ← Orchestrates all 5 models end-to-end
-│
-├── evaluation/
-│   ├── metrics.py               ← compute_metrics() → accuracy, precision, recall, F1, ROC-AUC
-│   └── benchmark.py             ← Leaderboard builder from result JSONs
-│
-├── prediction/
-│   ├── predictor.py             ← Loads model + scaler, runs inference
-│   └── predict.py               ← CLI inference script
-│
-├── dashboard/
-│   ├── app.py                   ← Flask app factory
-│   ├── routes.py                ← API routes (/api/leaderboard, /api/best, /api/results)
-│   └── templates/index.html     ← Premium dark-mode dashboard (Chart.js)
+├── training/                     ← Trainer, CV, hyperparameter tuning
+├── pipelines/training_pipeline.py
+├── evaluation/                   ← metrics.py, benchmark.py
+├── prediction/                   ← predictor.py, predict.py
+├── dashboard/                    ← Flask + Chart.js dark-mode UI
 │
 ├── experiments/
-│   ├── results/                 ← Per-model JSON results + leaderboard.json
-│   └── models/                  ← Saved .pkl model files + scaler.pkl
+│   ├── results/                  ← JSON results + leaderboard.json
+│   └── models/                   ← .pkl models + scaler.pkl
 │
-├── data/
-│   ├── raw/                     ← (reserved for future use)
-│   └── processed/               ← (preprocessed CSVs if exported)
-│
-├── docs/
-│   └── ProjectContext.md        ← Internal development notes
-│
-├── main.py                      ← Unified CLI entry point (train | dashboard | predict)
-├── Start.bat                    ← One-click launcher (venv activation + menu)
-└── requirements.txt             ← Python dependencies
+├── download_extension_data.py    ← [NEW v2.0] Download ERA5+NDVI for 2016-2025
+├── main.py                       ← Unified CLI (train | dashboard | predict)
+├── Start.bat                     ← One-click launcher
+└── requirements.txt              ← Python dependencies (+ GEE, rioxarray, rasterio)
 ```
 
 ---
 
-## 3. Data Pipeline
+## 3. Data Pipeline (v2.0)
 
-| Step | Detail |
-|---|---|
-| **Source** | ERA5 surface NetCDF files, years 2000–2015 (`era5_surface_YYYY.nc`) |
-| **Raw Variables** | `t2m` (2m temperature, K), `d2m` (dewpoint, K), `sp` (surface pressure, Pa), `u10`, `v10` (wind, m/s) |
-| **Engineered Features** | `t2m_c` (°C), `d2m_c` (°C), `heat_index`, `wind_speed`, `sp` |
-| **Heatwave Label** | `heatwave = 1` if `t2m ≥ 35 °C`, else `0` (highly imbalanced) |
-| **Data Split** | 70 % train / 15 % validation / 15 % test — stratified, `random_state=42` |
+### 3.1 ERA5 Variables
 
----
+| ตัวย่อ | ชื่อเต็ม                | หน่วย  |
+| ------ | ----------------------- | ------ |
+| `t2m`  | 2m Temperature          | K → °C |
+| `d2m`  | 2m Dewpoint Temperature | K → °C |
+| `sp`   | Surface Pressure        | Pa     |
+| `u10`  | 10m U-wind Component    | m/s    |
+| `v10`  | 10m V-wind Component    | m/s    |
 
-## 4. Models
+### 3.2 Feature Engineering Pipeline (v2.0)
 
-| # | Model | Library | Key Characteristics |
-|---|---|---|---|
-| 1 | **Balanced Random Forest** | `imbalanced-learn` | Handles class imbalance natively via balanced bootstrap sampling |
-| 2 | **XGBoost** | `xgboost` | Gradient boosting; eval set with early stopping on `logloss` |
-| 3 | **LightGBM** | `lightgbm` | Fast leaf-wise gradient boosting; early stopping |
-| 4 | **MLP Neural Network** | PyTorch | 3-layer MLP (256→128→64), ReLU activations, Dropout 0.3, Adam optimizer, early stopping (patience=10) |
-| 5 | **KAN** | PyTorch (custom) | Kolmogorov–Arnold Network; learnable B-spline activations per edge; grid_size=5, spline_order=3 |
-
-All models implement the [`BaseModel`](models/base_model.py) abstract interface: `train()`, `predict()`, `predict_proba()`, `save()`, `load()`.
-
----
-
-## 5. Training Pipeline
-
-**Entry**: [`pipelines/training_pipeline.py`](pipelines/training_pipeline.py) → `TrainingPipeline.run()`
-
-Steps:
-1. Load ERA5 NetCDF data via [`ERA5DataLoader`](utils/data_loader.py)
-2. Preprocess and label via [`HeatwavePreprocessor`](utils/preprocessing.py)
-3. Stratified train / val / test split
-4. For each of 5 models:
-   - Instantiate model with config hyperparameters
-   - Train via [`Trainer`](training/trainer.py)
-   - Evaluate on test set → compute metrics
-   - Save result JSON to [`experiments/results/`](experiments/results/)
-   - Save model `.pkl` to [`experiments/models/`](experiments/models/)
-5. Rebuild [`leaderboard.json`](experiments/results/leaderboard.json) ranked by F1 Score
-
-**Start training**:
-```bash
-python main.py --mode train
-# or via Start.bat → option 1
+```
+ERA5 NetCDF
+    ↓
+[1] K → °C conversion    (t2m, d2m)
+    ↓
+[2] _compute_rh_from_era5()       ← NEW Magnus formula: RH(%) จาก t2m_c + d2m_c
+    ↓
+[3] _compute_derived_features()   ← Rothfusz Heat Index, wind_speed
+    ↓
+[4] _merge_ndvi_features()        ← NEW MODIS NDVI + lag (skip ถ้า enabled: false)
+    ↓
+[5] _generate_labels()            ← Dual-mode: heat_index >= 41°C (default) | t2m_c >= 35°C
+    ↓
+[6] StandardScaler → train/val/test split (70/15/15 stratified)
 ```
 
----
+### 3.3 Final Feature List
 
-## 6. Prediction System
+| #   | Feature      | ที่มา              | หน่วย                   |
+| --- | ------------ | ------------------ | ----------------------- |
+| 1   | `t2m_c`      | ERA5               | °C                      |
+| 2   | `d2m_c`      | ERA5               | °C                      |
+| 3   | `rh`         | Derived (Magnus)   | %                       |
+| 4   | `heat_index` | Derived (Rothfusz) | °C                      |
+| 5   | `wind_speed` | Derived (u10+v10)  | m/s                     |
+| 6   | `sp`         | ERA5               | Pa                      |
+| 7   | `ndvi`       | MODIS MOD13A3      | [-1, 1] — เมื่อ enabled |
+| 8   | `ndvi_lag1`  | MODIS (lag 1m)     | [-1, 1] — เมื่อ enabled |
+| 9   | `ndvi_lag2`  | MODIS (lag 2m)     | [-1, 1] — เมื่อ enabled |
 
-**CLI usage**:
-```bash
-python main.py --mode predict --model xgboost --input data/processed/sample.csv
-python main.py --mode predict --model lightgbm --input data.csv --output results.csv --proba
-python prediction/predict.py --model kan --input data.csv
-```
+### 3.4 Heatwave Label Definition (v2.0)
 
-**Programmatic usage**:
 ```python
-from prediction.predictor import HeatwavePredictor
-predictor = HeatwavePredictor("xgboost")
-predictions = predictor.predict(df)
+# Heat Index Mode (default, config.yaml → labeling_method: "heat_index")
+RH = August-Roche-Magnus(t2m_c, d2m_c)
+HI = Rothfusz_Regression(t2m_c, RH)        # °C
+heatwave = 1 if HI >= 41.0 else 0
+
+# Legacy Temperature Mode (backward compat)
+heatwave = 1 if t2m_c >= 35.0 else 0
 ```
 
----
+**ผลการทดสอบ:**
+| กรณี | t2m | RH | HI | Label |
+|---|---|---|---|---|
+| ชื้น (Bangkok ก่อนฝน) | 35°C | 84.5% | 59.7°C | **1** ✅ |
+| แห้ง (ภาคเหนือฤดูแล้ง) | 35°C | 21.8% | 33.3°C | **0** ✅ |
 
-## 7. Dashboard
-
-**URL**: `http://localhost:5000`  
-**Stack**: Flask + Chart.js (dark-mode premium UI)
-
-| Route | Description |
-|---|---|
-| `GET /` | Main dashboard HTML |
-| `GET /api/leaderboard` | JSON leaderboard ranked by F1 |
-| `GET /api/best` | Best model metadata |
-| `GET /api/results` | All model result JSONs |
-
-**Features**:
-- Best Model hero card (accuracy, precision, recall, F1, ROC-AUC)
-- Full leaderboard table sortable by metric
-- 5 comparative charts: Accuracy, F1, Precision, Recall, ROC-AUC
-- Training timeline view
-- Auto-refresh every 60 seconds
-
-**Start dashboard**:
-```bash
-python main.py --mode dashboard
-# or via Start.bat → option 2
-```
+> [!TIP]
+> **Performance Optimization:** Heat Index calculation ถูกทำเป็น **Vectorized NumPy Operation** แล้ว สามารถประมวลผล 43.4 ล้านตัวอย่างได้ภายในไม่กี่นาที (แทนที่ระบบเดิมที่ใช้เวลานานหลายชั่วโมง)
 
 ---
 
-## 8. Configuration Reference
+## 4. NDVI Integration (v2.0)
 
-[`config/config.yaml`](config/config.yaml) is the single source of truth for all settings:
+### 4.1 Data Source
 
-```
-config.data.years                   List of ERA5 years to load (default: 2000–2015)
-config.data.heatwave_threshold_celsius  Label threshold (default: 35.0)
-config.split.train / val / test     Dataset proportions (70/15/15)
-config.training.use_gpu             Enable CUDA for PyTorch models (default: true)
-config.models.*                     Per-model hyperparameters
-config.experiments.*                Output directories for models, results, logs
-config.dashboard.port               Flask port (default: 5000)
-```
+| รายการ      | ค่า                                  |
+| ----------- | ------------------------------------ |
+| Product     | MODIS MOD13A3 v061                   |
+| Resolution  | 1 km → resample to 0.25° (ERA5 grid) |
+| Temporal    | Monthly composite                    |
+| Download    | Google Earth Engine (GEE)            |
+| GEE Project | `gen-lang-client-0381821743`         |
 
----
+### 4.2 NDVI Status
 
-## 9. GPU Support
+| ขั้นตอน                  | สถานะ                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| GEE Authentication       | ✅ เสร็จแล้ว                                                                                                                                   |
+| GEE Tasks 2000–2025      | ✅ Completed (All eras)                                                                                                                        |
+| Download .tif จาก Drive  | ✅ เสร็จสิ้น (26 ไฟล์)                                                                                                                         |
+| `ndvi_processor.py`      | ✅ Done — [ndvi_aligned_era5.nc](file:///c:/Users/ASUS/Desktop/HeatAI-model-Predic/Heatwave-AI-TRAIN/data/ndvi/ndvi_aligned_era5.nc) สร้างแล้ว |
+| `ndvi.enabled` ใน config | ✅ `true`                                                                                                                                      |
 
-[`utils/gpu_utils.py`](utils/gpu_utils.py) provides a CUDA detection helper. When `config.training.use_gpu: true` and a compatible GPU is available, PyTorch models (MLP, KAN) train on CUDA automatically. Sklearn-based models (BRF, XGBoost, LightGBM) use CPU multi-threading (`n_jobs: -1`).
-
----
-
-## 10. Experiment Artifacts
-
-All outputs are written to [`experiments/`](experiments/):
-
-| File | Description |
-|---|---|
-| `experiments/models/<name>_model.pkl` | Serialized trained model |
-| `experiments/models/scaler.pkl` | Fitted `StandardScaler` |
-| `experiments/models/feature_names.pkl` | Ordered feature name list |
-| `experiments/results/<name>_result.json` | Per-model metrics dict |
-| `experiments/results/leaderboard.json` | All models ranked by F1 Score |
-
----
-
-## 11. Quick Start
+### 4.3 NDVI Workflow
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+# 1. รอ GEE export → monitor: https://code.earthengine.google.com/tasks
+# 2. Download .tif จาก Google Drive folder "HeatAI_NDVI" → data/ndvi/
+python utils/ndvi_processor.py          # Reproject + Resample + saves ndvi_aligned_era5.nc
+# 3. เปิด NDVI (config.yaml → ndvi.enabled: true)
+python main.py --mode train             # Retrain with NDVI features
+```
 
-# 2. Train all 5 models
+---
+
+## 5. Data Coverage
+
+| Dataset          | ปีที่มี   | สถานะ                    |
+| ---------------- | --------- | ------------------------ |
+| ERA5 (original)  | 2000–2015 | ✅ พร้อม                 |
+| ERA5 (extension) | 2016–2025 | ✅ พร้อม (ดาวน์โหลดแล้ว) |
+| NDVI (original)  | 2000–2015 | ✅ พร้อม (Aligned)       |
+| NDVI (extension) | 2016–2025 | ✅ พร้อม (Aligned)       |
+
+---
+
+## 6. Models
+
+| #   | Model                      | Key Characteristics                                                          |
+| --- | -------------------------- | ---------------------------------------------------------------------------- |
+| 1   | **Balanced Random Forest** | `n_estimators=200`, `max_depth=15`, handles imbalance via balanced bootstrap |
+| 2   | **XGBoost**                | `n_estimators=300`, early stopping, GPU support                              |
+| 3   | **LightGBM**               | Fast leaf-wise boosting, early stopping                                      |
+| 4   | **MLP Neural Network**     | 3-layer (256→128→64), ReLU, Dropout 0.3, early stopping                      |
+| 5   | **KAN**                    | Kolmogorov–Arnold Network, B-spline activations, grid_size=5                 |
+
+### 6.1 Best Results (Label = old `t2m >= 35°C` — ต้อง Retrain ด้วย definition ใหม่)
+
+| Rank | Model           | F1     | ROC-AUC | หมายเหตุ                            |
+| ---- | --------------- | ------ | ------- | ----------------------------------- |
+| 🥇   | Balanced RF     | 0.9963 | 1.000   | Best — 190 วินาที                   |
+| 🥈   | LightGBM        | 0.6500 | 0.999   | Precision ต่ำ (0.48)                |
+| 3–5  | KAN/MLP/XGBoost | 0.0000 | —       | Predict 0 ทั้งหมด (class imbalance) |
+
+> ⚠️ **ต้อง Retrain ทุกโมเดล** หลังเปลี่ยน Label Definition เป็น Heat Index
+
+---
+
+## 7. Training & Split
+
+| รายการ           | ค่า                                 |
+| ---------------- | ----------------------------------- |
+| **Split Method** | Random Stratified (ไม่ใช่ Temporal) |
+| **Train**        | 70%                                 |
+| **Validation**   | 15%                                 |
+| **Test**         | 15%                                 |
+| **random_state** | 42                                  |
+
+---
+
+## 8. Configuration Reference (v2.0)
+
+`config/config.yaml` — fields ใหม่ที่เพิ่มใน v2.0:
+
+```yaml
+data:
+  labeling_method: "heat_index" # "heat_index" | "temperature"
+  heatwave_heat_index_threshold: 41.0 # °C
+  heat_index_thresholds:
+    caution: 27.0
+    extreme_caution: 32.0
+    danger: 41.0
+    extreme_danger: 54.0
+
+ndvi:
+  enabled: false # true หลัง download + process เสร็จ
+  gee_project: "gen-lang-client-0381821743"
+  start_year: 2000
+  end_year: 2015
+  output_dir: "data/ndvi/"
+  processed_file: "data/ndvi/ndvi_aligned_era5.nc"
+  lag_months: [0, 1, 2]
+```
+
+---
+
+## 9. Quick Start (v2.0)
+
+```bash
+# --- Train (current definition, no NDVI) ---
+Start.bat → [1] Train ALL
+
+# --- เมื่อ NDVI พร้อม ---
+# 1. วางไฟล์ .tif ใน data/ndvi/
+python utils/ndvi_processor.py          # สร้าง ndvi_aligned_era5.nc
+# 2. config.yaml → ndvi.enabled: true
 python main.py --mode train
 
-# 3. Launch dashboard
-python main.py --mode dashboard
+# --- ดาวน์โหลดข้อมูลเพิ่ม 2016-2025 ---
+python download_extension_data.py --update-config
 
-# 4. Run prediction
-python main.py --mode predict --model xgboost --input data.csv
+# --- Dashboard ---
+python main.py --mode dashboard         # http://localhost:5000
 
-# OR — one-click Windows launcher
-Start.bat
+# --- Predict ---
+python main.py --mode predict --model balanced_rf --input data.csv --proba
 ```
 
 ---
 
-## 12. Current Implementation Status
+## 10. Files Reference
 
-| Component | Status |
-|---|---|
-| Directory structure | ✅ Complete |
-| `config.yaml` | ✅ Complete |
-| ERA5 data loader | ✅ Complete |
-| Preprocessing pipeline | ✅ Complete |
-| All 5 models | ✅ Complete |
-| Metrics computation | ✅ Complete |
-| Leaderboard benchmark | ✅ Complete |
-| Trainer | ✅ Complete |
-| Cross-validation helper | ✅ Complete |
-| Hyperparameter tuning helper | ✅ Complete |
-| Training pipeline | ✅ Complete |
-| Prediction system (CLI + class) | ✅ Complete |
-| Flask dashboard | ✅ Complete |
-| `main.py` entry point | ✅ Complete |
-| `Start.bat` launcher | ✅ Complete |
-| GPU support scaffolding | ✅ Complete |
+| ไฟล์                         | คำอธิบาย                                              |
+| ---------------------------- | ----------------------------------------------------- |
+| `DATA_FAQ.md`                | ERA5 variables, NDVI source, Resolution, Label method |
+| `MODEL_SPECS.md`             | Train/test split, Feature list, BRF params, ผลจริง    |
+| `NDVI_SETUP_GUIDE.md`        | Step-by-step GEE authentication + download guide      |
+| `download_extension_data.py` | Download ERA5+NDVI 2016-2025                          |
+| `utils/ndvi_downloader.py`   | GEE export tasks                                      |
+| `utils/ndvi_processor.py`    | GeoTIFF → ERA5-aligned NetCDF                         |
+| `Heatwave-definition.md`     | Spec ของ Heat Index definition ใหม่                   |
+| `NDVI_INTEGRATION_PLAN.md`   | Spec ของ NDVI integration                             |
 
 ---
 
-## 13. Roadmap
+## 11. Implementation Status (v2.0)
 
-| Priority | Task |
-|---|---|
-| High | Full GPU training validation on CUDA hardware |
-| High | Hyperparameter tuning runs per model, then retrain |
-| Medium | Cross-validation metrics added to leaderboard |
-| Medium | ERA5 data extension: 2016–2025 years |
-| Medium | SHAP explainability plots in dashboard |
-| Low | `/api/predict` REST endpoint for web-based inference |
-| Low | Mobile-responsive dashboard layout |
-| Low | Email notifications on training completion |
+| Component                         | Status                               |
+| --------------------------------- | ------------------------------------ |
+| Heatwave Definition (Rothfusz HI) | ✅ Implemented + Tested              |
+| RH Calculation (Magnus formula)   | ✅ Implemented + Tested              |
+| Dual-mode label generation        | ✅ Implemented                       |
+| NDVI Downloader (GEE)             | ✅ Completed (All eras submitted)    |
+| NDVI Processor                    | ✅ Completed (Aligned dataset ready) |
+| ERA5 + NDVI extension 2016–2025   | ✅ All Data Ready (2000-2025)        |
+| **Retrain (43.4M samples)**       | ⏳ **Ready to start on GPU machine** |
 
 ---
 
-## 14. Dependencies
+## 12. Roadmap (v2.0)
 
-See [`requirements.txt`](requirements.txt) for the full locked dependency list. Key libraries:
+| Priority  | Task                                                        |
+| --------- | ----------------------------------------------------------- |
+| 🔴 สูงมาก | **Migrate ไปยัง GPU PC และเริ่ม Retrain (43.4M samples)**   |
+| 🟡 กลาง   | ตรวจสอบ Feature Importance หลังเทรน (ดูว่า NDVI มีผลแค่ไหน) |
+| 🟢 ต่ำ    | SHAP explainability plots ใน dashboard                      |
+| 🟢 ต่ำ    | `/api/predict` REST endpoint                                |
+| 🟢 ต่ำ    | Low/Medium/High Risk classification (prob threshold)        |
 
-| Library | Purpose |
-|---|---|
-| `xarray`, `netCDF4` | ERA5 NetCDF data ingestion |
-| `pandas`, `numpy` | Data manipulation |
-| `scikit-learn` | Preprocessing, metrics, CV, tree models |
-| `imbalanced-learn` | Balanced Random Forest |
-| `xgboost` | XGBoost model |
-| `lightgbm` | LightGBM model |
-| `torch` | PyTorch — MLP & KAN |
-| `flask` | Web dashboard server |
-| `pyyaml` | Config file parsing |
+---
+
+## 13. GPU Machine Transfer Guide
+
+หากต้องการย้ายไปเทรนบน PC เครื่องอื่นที่มี GPU:
+
+1. **GitHub Upload**: อัปโหลดไฟล์โค้ดทั้งหมด (ยกเว้น dataset ขนาดใหญ่ถ้าเกิน limit)
+2. **Data Files**: ต้องแน่ใจว่าไฟล์เหล่านี้ถูกย้ายไปด้วย (สำคัญมาก):
+   - โฟลเดอร์ `Era5-data-2000-2026/*.nc` (ประมาณ 10-15 GB)
+   - ไฟล์ `data/ndvi/ndvi_aligned_era5.nc` (แนะแนวทาง: ถ้าไฟล์นี้ใหญ่เกินไป ให้ย้ายเฉพาะโฟลเดอร์ `data/ndvi/*.tif` ไปรัน `ndvi_processor.py` ใหม่ที่เครื่องปลายทาง)
+3. **Environment**: รัน `pip install -r requirements.txt`
+   - ตรวจสอบให้แน่ใจว่าติดตั้ง `torch` เวอร์ชันที่มี support CUDA (เช่น `pip install torch --index-url https://download.pytorch.org/whl/cu121`)
+4. **Config**: ตรวจสอบ `config/config.yaml` → `training.use_gpu: true`
+
+---
+
+## 13. Dependencies (v2.0)
+
+| Library                 | Purpose                               |
+| ----------------------- | ------------------------------------- |
+| `xarray`, `netCDF4`     | ERA5 NetCDF ingestion                 |
+| `pandas`, `numpy`       | Data manipulation                     |
+| `scikit-learn`          | Preprocessing, metrics, CV            |
+| `imbalanced-learn`      | Balanced Random Forest                |
+| `xgboost`, `lightgbm`   | Gradient boosting models              |
+| `torch`                 | PyTorch — MLP & KAN                   |
+| `flask`                 | Web dashboard                         |
+| `pyyaml`                | Config parsing                        |
+| `earthengine-api`       | **[NEW]** MODIS NDVI download via GEE |
+| `rioxarray`, `rasterio` | **[NEW]** GeoTIFF reproject/resample  |
+| `cdsapi`                | **[NEW]** ERA5 extension download     |
+| `bottleneck`, `numexpr` | **[NEW]** xarray acceleration         |

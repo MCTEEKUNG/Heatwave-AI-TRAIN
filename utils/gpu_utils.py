@@ -52,7 +52,7 @@ def get_device(use_gpu: bool = True):
 def get_use_gpu_flag(config_path: str = "config/config.yaml") -> bool:
     """Read the training.use_gpu flag from config. Defaults to True."""
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         return bool(cfg.get("training", {}).get("use_gpu", True))
     except Exception:
@@ -66,7 +66,7 @@ def get_mixed_precision_flag(config_path: str = "config/config.yaml") -> bool:
     Falls back to False on CPU-only environments.
     """
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         amp_cfg = bool(cfg.get("training", {}).get("mixed_precision", True))
     except Exception:

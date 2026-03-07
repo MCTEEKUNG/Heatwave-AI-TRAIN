@@ -20,7 +20,7 @@ class LightGBMModel(BaseModel):
     """LightGBM Gradient Boosting Classifier with GPU/CPU auto-selection."""
 
     def __init__(self, config_path: str = "config/config.yaml"):
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         params = cfg["models"]["lightgbm"]
         self._config_path = config_path
@@ -67,7 +67,7 @@ class LightGBMModel(BaseModel):
             if is_gpu_err or is_split_err:
                 logger.warning("LightGBM GPU training failed (%s) — retrying on CPU with imbalance handling", e)
                 import lightgbm as lgb
-                with open(self._config_path) as f:
+                with open(self._config_path, encoding="utf-8") as f:
                     cfg = yaml.safe_load(f)
                 p = cfg["models"]["lightgbm"]
                 self.model = lgb.LGBMClassifier(

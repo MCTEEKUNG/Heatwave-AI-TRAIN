@@ -72,7 +72,7 @@ def run_training(config_path: str, selected_models: list = None):
 
 def run_dashboard(config_path: str):
     import yaml
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     dash = cfg.get("dashboard", {})
 

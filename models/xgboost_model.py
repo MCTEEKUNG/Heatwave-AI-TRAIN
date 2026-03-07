@@ -20,7 +20,7 @@ class XGBoostModel(BaseModel):
     """XGBoost Gradient Boosting Classifier with GPU/CPU auto-selection."""
 
     def __init__(self, config_path: str = "config/config.yaml"):
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         params = cfg["models"]["xgboost"]
         self._config_path = config_path
@@ -56,7 +56,7 @@ class XGBoostModel(BaseModel):
             if "gpu" in str(e).lower() or "cuda" in str(e).lower():
                 logger.warning("GPU training failed (%s) — retrying on CPU", e)
                 from xgboost import XGBClassifier
-                with open(self._config_path) as f:
+                with open(self._config_path, encoding="utf-8") as f:
                     cfg = yaml.safe_load(f)
                 p = cfg["models"]["xgboost"]
                 self.model = XGBClassifier(

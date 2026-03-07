@@ -44,7 +44,7 @@ class Predictor:
     """Loads a saved model and scaler, runs prediction on new input data."""
 
     def __init__(self, config_path: str = "config/config.yaml"):
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
         self.models_dir = self.cfg["experiments"]["models_dir"]
         self.config_path = config_path
